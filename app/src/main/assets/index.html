@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Калькулятор AWG и мм²</title>
+<style>
+:root{
+  --bg:#f2f4f5; --card:#ffffff; --ink:#18242c; --mute:#5b6b75; --line:#d6dde1;
+  --accent:#ffc400; --on-accent:#18242c; --cu:#c9763c; --cu-hi:#e09a62; --ins:#1d3b4d;
+  --ok:#1f7a4d;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f171c; --card:#18242c; --ink:#eaf0f3; --mute:#9db0bb; --line:#2c3d47;
+    --accent:#ffc400; --on-accent:#18242c; --ins:#6f93a8; --ok:#5ed39a;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:28px;line-height:1.1;margin:8px 0 4px;letter-spacing:-.01em}
+.lead{color:var(--mute);margin:0 0 18px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
+.seg button{border:0;background:transparent;color:var(--mute);font:inherit;font-size:14px;font-weight:600;line-height:1.2;padding:10px 4px;border-radius:9px;cursor:pointer}
+.seg button[aria-selected="true"]{background:var(--accent);color:var(--on-accent)}
+.seg button:focus-visible,input:focus-visible,tbody tr:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px}
+.row{display:grid;grid-template-columns:1fr 110px;gap:12px}
+label{display:block;font-size:14px;color:var(--mute);margin-bottom:6px}
+input{width:100%;font:inherit;font-size:22px;font-weight:600;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font-variant-numeric:tabular-nums}
+.hint{font-size:13px;color:var(--mute);margin:8px 0 0}
+.err{color:#c0392b;font-weight:600;margin:0}
+.result{display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center}
+.vis{width:132px;height:132px;display:block}
+.big{font-size:34px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;color:var(--mute);margin-left:4px}
+dl{margin:8px 0 0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-variant-numeric:tabular-nums}
+dt{color:var(--mute)} dd{margin:0;font-weight:600;text-align:right}
+.pick{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.pick b{color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:9px 6px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{font-size:13px;color:var(--mute);font-weight:600}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bg)}
+h2{font-size:18px;margin:26px 0 0}
+.box{overflow-x:auto}
+select{width:100%;font:inherit;font-size:17px;font-weight:600;padding:11px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.row2:first-child{margin-top:0}
+h3{font-size:16px;margin:18px 0 10px}.unit{display:flex;gap:6px}.unit select{width:76px;flex:none}
+details.k{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:10px;padding:0 14px}
+details.k summary{cursor:pointer;padding:14px 0}
+details.k summary b{display:block;font-size:18px}
+details.k summary span{color:var(--mute);font-size:14px}
+details.k[open] summary{border-bottom:1px solid var(--line)}
+.kv{display:block;margin:0;padding:4px 0 14px}.kv dt{color:var(--mute);font-size:13px;margin-top:10px}.kv dd{margin:2px 0 0;text-align:left;font-weight:400}
+footer{color:var(--mute);font-size:13px;margin-top:22px}
+@media (max-width:380px){.result{grid-template-columns:1fr}.vis{margin:0 auto}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Сечение провода</h1>
+  <p class="lead">AWG, диаметр, сечение и подбор кабеля по току или мощности. Округление всегда в большую сторону.</p>
+
+  <div class="seg" role="tablist" aria-label="Режим">
+    <button role="tab" id="tab-c" aria-selected="true">Диаметр и сечение</button>
+    <button role="tab" id="tab-d" aria-selected="false">Сечение по току</button>
+    <button role="tab" id="tab-a" aria-selected="false">Пересчёт AWG</button>
+    <button role="tab" id="tab-k" aria-selected="false">Кабели и провода</button>
+  </div>
+
+  <section class="card" id="panel-c">
+    <div class="row2">
+      <div><label for="sec">Сечение, мм²</label><input id="sec" type="text" inputmode="decimal" autocomplete="off"></div>
+      <div><label for="dia">Диаметр жилы, мм</label><input id="dia" type="text" inputmode="decimal" autocomplete="off" value="4"></div>
+    </div>
+    <p class="hint">Меняй любое поле, второе пересчитается. Формула для сплошной круглой жилы.</p>
+    <div class="row2">
+      <div><label for="c-mat">Материал жилы</label><select id="c-mat"><option value="cu">Медь</option><option value="al">Алюминий</option></select></div>
+      <div><label for="c-lay">Прокладка</label><select id="c-lay"><option value="1">Открыто, одиночные провода</option><option value="2">В трубе, 2 одножильных</option><option value="3">В трубе, 3 одножильных</option><option value="4">Многожильный, 2 жилы</option><option value="5">Многожильный, 3 жилы</option></select></div>
+    </div>
+    <div class="pick" id="c-out"></div>
+    <div class="pick" id="c-amp"></div>
+    <h3>Многожильный провод</h3>
+    <div class="row2">
+      <div><label for="sn">Число жилок</label><input id="sn" type="text" inputmode="numeric" autocomplete="off" value="19"></div>
+      <div><label for="sd">Диаметр одной жилки, мм</label><input id="sd" type="text" inputmode="decimal" autocomplete="off" value="0,5"></div>
+    </div>
+    <div class="pick" id="s-out"></div>
+  </section>
+
+  <section class="card" id="panel-d" hidden>
+    <div class="row2">
+      <div><label for="d-known">Что известно</label><select id="d-known"><option value="P">Мощность</option><option value="I">Ток</option></select></div>
+      <div><label for="d-val" id="d-val-l">Мощность</label><div class="unit"><input id="d-val" type="text" inputmode="decimal" autocomplete="off" value="3000"><select id="d-unit" aria-label="Единица"><option value="w">Вт</option><option value="kw">кВт</option></select></div></div>
+    </div>
+    <div class="row2">
+      <div><label for="d-net">Сеть</label><select id="d-net"><option value="dc">Постоянный ток</option><option value="1" selected>Однофазная</option><option value="3">Трёхфазная</option></select></div>
+      <div><label for="d-u">Напряжение, В</label><input id="d-u" type="text" inputmode="decimal" autocomplete="off" value="220"></div>
+    </div>
+    <div class="row2">
+      <div><label for="d-cos">cos φ</label><input id="d-cos" type="text" inputmode="decimal" autocomplete="off" value="0,95"></div>
+      <div><label for="d-len">Длина в одну сторону, м</label><input id="d-len" type="text" inputmode="decimal" autocomplete="off" value="2"></div>
+    </div>
+    <div class="row2">
+      <div><label for="d-mat">Материал жилы</label><select id="d-mat"><option value="cu">Медь</option><option value="al">Алюминий</option></select></div>
+      <div><label for="d-lay">Прокладка</label><select id="d-lay"><option value="open">Открыто, одиночные провода</option><option value="pipe">В трубе или гофре, одножильные</option><option value="cable">Многожильный в трубе</option></select></div>
+    </div>
+    <div class="row2">
+      <div><label for="d-drop">Допустимое падение, %</label><input id="d-drop" type="text" inputmode="decimal" autocomplete="off" value="3"></div>
+      <div></div>
+    </div>
+  </section>
+  <section class="card" id="out-d" hidden aria-live="polite"></section>
+
+  <section class="card" id="panel-a" hidden>
+    <div class="row2">
+      <div><label for="v-awg">Номер AWG</label><input id="v-awg" type="text" inputmode="text" autocomplete="off" value="6"></div>
+      <div><label for="v-mm">Сечение, мм²</label><input id="v-mm" type="text" inputmode="decimal" autocomplete="off"></div>
+    </div>
+    <div class="row2">
+      <div><label for="cnt">Проводов</label><input id="cnt" type="text" inputmode="numeric" autocomplete="off" value="1"></div>
+      <div></div>
+    </div>
+    <p class="hint">Меняй AWG или сечение, второе поле пересчитается. Для толстых проводов вводи 1/0, 2/0, 3/0 или 4/0. По сечению подбирается AWG не тоньше нужного.</p>
+    <p class="err" id="err" role="alert" hidden></p>
+  </section>
+  <section class="card" id="out" hidden aria-live="polite"></section>
+
+  <section id="panel-k" hidden>
+    <div class="card"><div class="row2">
+      <div><label for="k-q">Поиск по названию</label><input id="k-q" type="text" autocomplete="off" placeholder="например, ВВГ"></div>
+      <div><label for="k-grp">Тип</label><select id="k-grp"><option value="all">Все</option><option value="p">Силовые</option><option value="m">Установочные</option><option value="f">Гибкие и шнуры</option><option value="v">Воздушные</option></select></div>
+    </div>
+    <p class="hint">Нажми на название, чтобы открыть характеристики. Значения типовые, по ГОСТ и техническим описаниям производителей. Для конкретного кабеля смотри его маркировку и ТУ.</p></div>
+    <div id="k-list"></div>
+  </section>
+
+  <div id="awg-table" hidden>
+  <h2>Таблица AWG</h2>
+  <p class="hint" style="margin-top:4px">Нажми на строку, чтобы подставить её в расчёт.</p>
+  <div class="card box"><table>
+    <thead><tr><th>AWG</th><th>мм²</th><th>Диаметр, мм</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table></div>
+  </div>
+
+  <footer>Диаметр d = 0,127 × 92^((36 − n) / 39) мм, сечение S = π·d²/4. Допустимые токи взяты из таблиц ПУЭ 1.3.4 и 1.3.5 (провода с резиновой и ПВХ изоляцией, жила +65 °C, воздух +25 °C), на группы проводов поправки не вводятся. Падение напряжения считается по сопротивлению нагретой жилы без учёта реактивной составляющей. Это ориентир: для ответственных линий и расчёта аккумуляторных цепей проверь результат у электрика.</footer>
+</main>
+
+<script>
+var STD = [0.5,0.75,1,1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
+function awgDiam(n){ return 0.127*Math.pow(92,(36-n)/39); }
+function awgArea(n){ var d=awgDiam(n); return Math.PI*d*d/4; }
+function areaToAwg(s){ var d=Math.sqrt(4*s/Math.PI); return 36-39*Math.log(d/0.127)/Math.log(92); }
+function parseNum(str){ var v=parseFloat(String(str).trim().replace(',', '.')); return isFinite(v)?v:NaN; }
+function parseAwg(str){
+  var s=String(str).trim().replace(/\s+/g,'').replace(',', '.');
+  var m=s.match(/^(\d+)\/0$/);
+  if(m){ var k=parseInt(m[1],10); return (k>=1&&k<=4)?1-k:NaN; }
+  if(/^0+$/.test(s)){ return s.length<=4 ? 1-s.length : NaN; }
+  var v=parseFloat(s);
+  return (isFinite(v)&&v>=1&&v<=40)?v:NaN;
+}
+function fmtAwg(n){ return n>=1 ? String(n) : (1-n)+'/0'; }
+function fmt(x,dp){ return x.toLocaleString('ru-RU',{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function stdAtLeast(s){ for(var i=0;i<STD.length;i++){ if(STD[i]>=s-1e-9) return STD[i]; } return null; }
+function stdNearest(s){ var best=STD[0]; STD.forEach(function(x){ if(Math.abs(x-s)<Math.abs(best-s)) best=x; }); return best; }
+var TB={
+ cu:[[1,17,16,15,15,14],[1.5,23,19,17,18,15],[2.5,30,27,25,25,21],[4,41,38,35,32,27],[6,50,46,42,40,34],[10,80,70,60,55,50],[16,100,85,80,80,70],[25,140,115,100,100,85],[35,170,135,125,125,100],[50,215,185,170,160,135],[70,270,225,210,195,175],[95,330,275,255,245,215],[120,385,315,290,295,250],[150,440,360,330,0,0]],
+ al:[[2.5,24,20,19,19,16],[4,32,28,28,25,21],[6,39,36,32,31,26],[10,60,50,47,42,38],[16,75,60,60,60,55],[25,105,85,80,75,65],[35,130,100,95,95,75],[50,165,140,130,125,105],[70,210,175,165,150,135],[95,255,215,200,190,165],[120,295,245,220,230,190],[150,340,275,255,0,0]]};
+var RHO={cu:0.0206,al:0.0333};
+function ampFor(mat,col,S){ if(S>150.005) return null; var rows=TB[mat], b=null; for(var i=0;i<rows.length;i++){ if(rows[i][0]<=S+1e-9 && rows[i][col]>0) b=rows[i]; } return b?{a:b[col],s:b[0],exact:Math.abs(b[0]-S)<0.005}:null; }
+function diaToArea(d){ return Math.PI*d*d/4; }
+function areaToDia(s){ return Math.sqrt(4*s/Math.PI); }
+function loadCalc(o){
+  var I = o.known==='I' ? o.val : (function(){ var P=o.val*(o.kw?1000:1); return o.net==='dc'?P/o.U : o.net==='1'?P/(o.U*o.cos) : P/(Math.sqrt(3)*o.U*o.cos); })();
+  var col = o.lay==='open'?1 : o.lay==='pipe'?(o.net==='3'?3:2) : (o.net==='3'?5:4);
+  var rows=TB[o.mat], sh=null, ah=null, i;
+  for(i=0;i<rows.length;i++){ if(rows[i][col]>0 && rows[i][col]>=I-1e-9){ sh=rows[i][0]; ah=rows[i][col]; break; } }
+  var k=o.net==='3'?Math.sqrt(3):2, sd=k*RHO[o.mat]*o.len*I/(o.U*o.drop/100);
+  var fin = sh===null ? null : stdAtLeast(Math.max(sh,sd)), aFin=null;
+  if(fin) for(i=0;i<rows.length;i++){ if(rows[i][0]===fin && rows[i][col]>0) aFin=rows[i][col]; }
+  var dU = fin ? k*RHO[o.mat]*o.len*I/fin : null;
+  return {I:I, sh:sh, ah:ah, sd:sd, fin:fin, aFin:aFin, dU:dU, pct:fin?dU/o.U*100:null, loss:fin?(o.net==='3'?Math.sqrt(3):1)*I*dU:null};
+}
+if (typeof module!=='undefined') module.exports={ampFor:ampFor,loadCalc:loadCalc,diaToArea:diaToArea,areaToDia:areaToDia,awgDiam:awgDiam,awgArea:awgArea,areaToAwg:areaToAwg,parseAwg:parseAwg,fmtAwg:fmtAwg,stdAtLeast:stdAtLeast};
+</script>
+<script>
+if (typeof document!=='undefined') (function(){
+  var $=function(id){return document.getElementById(id);};
+  function wire(d){
+    var r=Math.min(58, d*5.2), ins=Math.min(62, r+7);
+    return '<svg class="vis" viewBox="0 0 132 132" role="img" aria-label="Сечение жилы в масштабе"><circle cx="66" cy="66" r="'+ins+'" fill="var(--ins)"/><circle cx="66" cy="66" r="'+r+'" fill="var(--cu)"/><circle cx="'+(66-r*0.28)+'" cy="'+(66-r*0.28)+'" r="'+(r*0.45)+'" fill="var(--cu-hi)" opacity=".55"/></svg>';
+  }
+  function aw(s){ var n=Math.floor(areaToAwg(s)+1e-9); return n<-3||n>40 ? '' : ' (≈ '+fmtAwg(n)+' AWG, не тоньше)'; }
+  function num(x){ return fmt(x,3).replace(/\s/g,''); }
+
+  /* ---- Диаметр и сечение ---- */
+  var dia=$('dia'), sec=$('sec');
+  function ampHtml(s){
+    var r=ampFor($('c-mat').value, parseInt($('c-lay').value,10), s);
+    return r ? 'Допустимый ток: <b>'+r.a+' А</b>'+(r.exact?'':' (по ближайшему меньшему сечению из таблицы, '+fmt(r.s,r.s%1?1:0)+' мм²)') : 'Допустимый ток: в таблице ПУЭ нет данных для этого сечения и способа прокладки.';
+  }
+  function fromDia(){ var d=parseNum(dia.value); if(d>0){ sec.value=num(diaToArea(d)); } cOut(); }
+  function fromSec(){ var s=parseNum(sec.value); if(s>0){ dia.value=num(areaToDia(s)); } cOut(); }
+  function cOut(){
+    var s=parseNum(sec.value), d=parseNum(dia.value);
+    $('c-out').innerHTML = (s>0&&d>0) ? 'Диаметр '+fmt(d,2)+' мм, сечение '+fmt(s,2)+' мм²'+aw(s) : 'Введи диаметр или сечение.';
+    $('c-amp').innerHTML = s>0 ? ampHtml(s) : '';
+    var n=parseInt($('sn').value,10), sdm=parseNum($('sd').value);
+    if(n>=1&&sdm>0){ var t=n*diaToArea(sdm), st=stdAtLeast(t); $('s-out').innerHTML='Сечение: <b>'+fmt(t,2)+' мм²</b>'+aw(t)+'<br>'+ampHtml(t)+'<br>Равный по сечению сплошной провод: '+fmt(areaToDia(t),2)+' мм<br>Ближайшее стандартное не меньше: '+(st?fmt(st,st%1?2:0)+' мм²':'больше 240 мм²'); }
+    else $('s-out').textContent='Введи число и диаметр жилок.';
+  }
+  dia.addEventListener('input',fromDia); sec.addEventListener('input',fromSec);
+  ['sn','sd','c-mat','c-lay'].forEach(function(id){ $(id).addEventListener('input',cOut); });
+  function calcC(){ if(!sec.value) fromDia(); else cOut(); }
+
+  /* ---- Сечение по току ---- */
+  var dOut=$('out-d');
+  function calcD(){
+    var known=$('d-known').value, net=$('d-net').value;
+    $('d-val-l').textContent = known==='P'?'Мощность':'Ток, А';
+    $('d-unit').hidden = known==='I';
+    var o={known:known,val:parseNum($('d-val').value),kw:$('d-unit').value==='kw',net:net,U:parseNum($('d-u').value),cos:net==='dc'?1:parseNum($('d-cos').value),
+           len:parseNum($('d-len').value),mat:$('d-mat').value,lay:$('d-lay').value,drop:parseNum($('d-drop').value)};
+    var bad = !(o.val>0)?'Введи мощность или ток.' : !(o.U>0)?'Введи напряжение.' : !(o.cos>=0.1&&o.cos<=1)?'cos φ должен быть от 0,1 до 1.' : !(o.len>0&&o.len<=1000)?'Длина от 0,1 до 1000 м.' : !(o.drop>=0.1&&o.drop<=20)?'Падение напряжения от 0,1 до 20%.' : '';
+    if(bad){ dOut.innerHTML='<p class="err">'+bad+'</p>'; return; }
+    var r=loadCalc(o), f=fmt;
+    if(r.fin===null){
+      dOut.innerHTML='<p class="err">Ток '+f(r.I,1)+' А выше значений таблицы'+(r.sh===null?' для сечения 150 мм²':'')+'. Нужен расчёт проектировщика или несколько параллельных кабелей.</p>'; return;
+    }
+    dOut.innerHTML='<div class="result">'+wire(areaToDia(r.fin))+'<div><div class="big">'+f(r.fin,r.fin%1?1:0)+'<small>мм²</small></div><div class="hint" style="margin:2px 0 0">'+aw(r.fin).replace(/^ \(|\)$/g,'')+'</div>'+
+      '<dl><dt>Ток нагрузки</dt><dd>'+f(r.I,1)+' А</dd><dt>По нагреву</dt><dd>'+f(r.sh,r.sh%1?1:0)+' мм² ('+r.ah+' А)</dd><dt>По падению</dt><dd>от '+f(r.sd,1)+' мм²</dd></dl></div></div>'+
+      '<div class="pick">Падение напряжения: <b>'+f(r.dU,2)+' В ('+f(r.pct,1)+'%)</b><br>Потери в кабеле: '+f(r.loss,0)+' Вт'+(r.aFin?'<br>Допустимый ток выбранного сечения: '+r.aFin+' А. Автомат ставь не выше этого тока.':'')+'</div>';
+  }
+  ['d-known','d-val','d-unit','d-u','d-cos','d-len','d-mat','d-lay','d-drop'].forEach(function(id){ $(id).addEventListener('input',calcD); });
+  $('d-net').addEventListener('input',function(){
+    var n=$('d-net').value; $('d-u').value=n==='dc'?'24':n==='1'?'220':'380';
+    $('d-cos').value=n==='dc'?'1':n==='1'?'0,95':'0,9'; $('d-cos').disabled=(n==='dc'); calcD();
+  });
+
+  /* ---- Пересчёт AWG ---- */
+  var src='awg', vA=$('v-awg'), vM=$('v-mm'), cnt=$('cnt'), out=$('out'), err=$('err');
+  function showErr(t){ err.textContent=t; err.hidden=false; out.innerHTML=''; }
+  function calcA(){
+    err.hidden=true;
+    var c=parseInt(cnt.value,10);
+    if(!(c>=1&&c<=20)){ return showErr('Число проводов должно быть от 1 до 20.'); }
+    if(src==='awg'){
+      var n=parseAwg(vA.value);
+      if(isNaN(n)){ return showErr('Введи номер AWG от 1 до 40 или 1/0, 2/0, 3/0, 4/0.'); }
+      var s=awgArea(n), d=awgDiam(n), tot=s*c, sa=stdAtLeast(tot), sn=stdNearest(tot);
+      vM.value=num(tot);
+      out.innerHTML='<div class="result">'+wire(d)+'<div><div class="big">'+fmt(tot,tot<10?2:1)+'<small>мм²</small></div>'+
+        '<div class="hint" style="margin:2px 0 0">'+(c>1?c+' × '+fmtAwg(n)+' AWG':fmtAwg(n)+' AWG')+'</div>'+
+        '<dl><dt>Сечение одного</dt><dd>'+fmt(s,2)+' мм²</dd><dt>Диаметр жилы</dt><dd>'+fmt(d,2)+' мм</dd></dl></div></div>'+
+        '<div class="pick">Стандартное сечение не меньше: <b>'+(sa?fmt(sa,sa<10?(sa%1?2:0):0)+' мм²':'больше 240 мм²')+'</b><br>Ближайшее по значению: '+fmt(sn,sn<10?(sn%1?2:0):0)+' мм²</div>';
+    } else {
+      var S=parseNum(vM.value);
+      if(!(S>0&&S<=1000)){ return showErr('Введи сечение в мм² от 0,05 до 1000.'); }
+      var per=S/c, nf=areaToAwg(per), safe=Math.floor(nf+1e-9), near=Math.round(nf);
+      if(safe<-3){ return showErr('Для такого сечения нужны несколько проводов или кабель толще 4/0 AWG.'); }
+      if(safe>40){ return showErr('Слишком тонкий провод.'); }
+      var as=awgArea(safe), an=awgArea(near);
+      var pct=function(a){ var p=(a/per-1)*100; return (p>=0?'+':'−')+fmt(Math.abs(p),1)+'%'; };
+      vA.value=fmtAwg(safe);
+      out.innerHTML='<div class="result">'+wire(awgDiam(safe))+'<div><div class="big">'+fmtAwg(safe)+'<small>AWG</small></div>'+
+        '<div class="hint" style="margin:2px 0 0">не тоньше нужного'+(c>1?', каждый из '+c+' проводов':'')+'</div>'+
+        '<dl><dt>Сечение</dt><dd>'+fmt(as,2)+' мм²</dd><dt>Запас</dt><dd>'+pct(as)+'</dd><dt>Диаметр жилы</dt><dd>'+fmt(awgDiam(safe),2)+' мм</dd></dl></div></div>'+
+        '<div class="pick">Точное значение: '+fmt(nf,2)+' AWG<br>Ближайший по значению: <b>'+fmtAwg(near)+' AWG</b> ('+fmt(an,2)+' мм², '+pct(an)+')'+(an<per?'<br>Он тоньше нужного, брать его нельзя.':'')+'</div>';
+    }
+  }
+  vA.addEventListener('input',function(){ src='awg'; calcA(); });
+  vM.addEventListener('input',function(){ src='mm'; calcA(); });
+  cnt.addEventListener('input',calcA);
+
+  var rows='';
+  for(var n=-3;n<=20;n++){ rows+='<tr tabindex="0" data-n="'+n+'"><td>'+fmtAwg(n)+'</td><td>'+fmt(awgArea(n),2)+'</td><td>'+fmt(awgDiam(n),2)+'</td></tr>'; }
+  $('tbody').innerHTML=rows;
+  function pick(tr){ setMode('a'); src='awg'; vA.value=fmtAwg(parseInt(tr.getAttribute('data-n'),10)); calcA(); window.scrollTo({top:0,behavior:'smooth'}); }
+  $('tbody').addEventListener('click',function(e){ var tr=e.target.closest('tr'); if(tr) pick(tr); });
+  $('tbody').addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ var tr=e.target.closest('tr'); if(tr){ e.preventDefault(); pick(tr);} } });
+
+  /* ---- Кабели и провода ---- */
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var CAB=[
+   {g:'p',n:'ВВГнг(А)-LS',s:'Силовой, медь, ПВХ, не распространяет горение',r:[
+    ['Что это','Силовой кабель без брони: медные жилы, изоляция и оболочка из ПВХ. Без индексов это ВВГ, плоский вариант ВВГ-П. Индекс нг(А): не распространяет горение при групповой прокладке, LS: пониженные дымо- и газовыделение.'],
+    ['Жила','Медь. До 16 мм² однопроволочная (класс 1), свыше 16 мм² многопроволочная.'],
+    ['Напряжение','0,66 и 1 кВ, 50 Гц.'],
+    ['Температуры','Эксплуатация от −50 до +50 °C. Монтаж без подогрева не ниже −15 °C. Жила длительно до +70 °C, при коротком замыкании до +160 °C.'],
+    ['Радиус изгиба','Не менее 7,5 диаметров (многожильный) и 10 диаметров (одножильный).'],
+    ['Применение','Стационарная проводка в зданиях, щитах, каналах и на лотках. LS выбирают для мест, где бывают люди.'],
+    ['Ограничения','Не для подвижных соединений. В земле только с защитой от механических повреждений.'],
+    ['Стандарт','ГОСТ 31996-2012.']]},
+   {g:'p',n:'АВВГнг(А)-LS',s:'Силовой, алюминий, ПВХ',r:[
+    ['Что это','Аналог ВВГ с алюминиевыми жилами, изоляция и оболочка из ПВХ. Индексы нг(А) и LS те же.'],
+    ['Жила','Алюминий, однопроволочная или многопроволочная, круглая или секторная, класс 1 или 2.'],
+    ['Напряжение','0,66 и 1 кВ, 50 Гц.'],
+    ['Температуры','Эксплуатация от −50 до +50 °C. Жила длительно до +70 °C.'],
+    ['Радиус изгиба','Не менее 10 диаметров (одножильный) и 7,5 диаметров (многожильный).'],
+    ['Применение','Стационарное распределение электроэнергии: вводы и магистральные линии, где важна экономия на металле.'],
+    ['Особенности','При том же сечении пропускает меньший ток, чем медь (таблица ПУЭ 1.3.5), и требует специальных зажимов для соединений.'],
+    ['Стандарт','ГОСТ 31996-2012.']]},
+   {g:'p',n:'NYM',s:'Силовой, медь, ПВХ, серая оболочка',r:[
+    ['Что это','Кабель по немецкому стандарту VDE 0250. Между жилами и оболочкой слой невулканизированной резиновой смеси, оболочка серая. Российские аналоги: ВВГнг и ВВГ-Пнг.'],
+    ['Жила','Медь, однопроволочная (класс 1).'],
+    ['Напряжение','300/500 В по VDE. По российским ТУ до 660 В.'],
+    ['Температуры','Жила длительно до +70 °C, при коротком замыкании до +160 °C (до 4 с).'],
+    ['Применение','Стационарные установки: питание стационарно подключённых бытовых приборов и промышленных установок.'],
+    ['Ограничения','Не для прокладки в земле и на открытом воздухе без защиты.'],
+    ['Стандарт','DIN VDE 0250-204. В России, например, ТУ 3521-057-05755714-2010.']]},
+   {g:'p',n:'ВБбШв',s:'Силовой бронированный, медь, для земли',r:[
+    ['Что это','Силовой кабель с медными жилами и ПВХ изоляцией. Поверх неё броня из стальных лент без подушки (Бб) и защитный шланг из ПВХ (Шв). Вариант с пониженной горючестью: ВБбШнг.'],
+    ['Напряжение','0,66 и 1 кВ.'],
+    ['Применение','Прокладка в земле (траншеях) и кабельных сооружениях: броня защищает от механических повреждений.'],
+    ['Особенности','Тяжелее и жёстче небронированного ВВГ, при монтаже нужен больший радиус изгиба.'],
+    ['Стандарт','ГОСТ 16442-80 (ВБбШв), ТУ 16.К01-37-2003 (ВБбШнг).']]},
+   {g:'m',n:'ПуВ (ПВ-1)',s:'Установочный провод, медь, ПВХ',r:[
+    ['Что это','Одножильный провод с медной жилой и изоляцией из ПВХ, без оболочки. Прежнее обозначение ПВ-1.'],
+    ['Жила','Медь, жёсткая: однопроволочная или многопроволочная (класс 1–2).'],
+    ['Напряжение','450/750 В.'],
+    ['Температуры','Жила длительно до +70 °C.'],
+    ['Применение','Прокладка в стальных трубах, пустотных каналах строительных конструкций, на лотках; монтаж цепей внутри электрооборудования.'],
+    ['Ограничения','Без оболочки: открыто по стенам без трубы или короба не прокладывают.'],
+    ['Стандарт','ГОСТ 31947-2012.']]},
+   {g:'m',n:'ПуГВ (ПВ-3)',s:'Монтажный провод, медь, гибкий',r:[
+    ['Что это','Одножильный гибкий провод с изоляцией из ПВХ. Прежнее обозначение ПВ-3. Основной провод для сборки щитов.'],
+    ['Жила','Медь, гибкая многопроволочная, класс 4–5 (до 10 мм²).'],
+    ['Напряжение','450/750 В.'],
+    ['Температуры','Жила длительно до +70 °C.'],
+    ['Применение','Монтаж щитов и шкафов, подключение внутри оборудования, прокладка в трубах и коробах.'],
+    ['Особенности','Гибкую жилу зажимают в наконечниках (НШВИ или кольцевых), а не голой в винтовой клемме.'],
+    ['Стандарт','ГОСТ 31947-2012.']]},
+   {g:'f',n:'ПВС',s:'Гибкий круглый провод, медь, ПВХ',r:[
+    ['Что это','Гибкий круглый провод с несколькими жилами, изоляция и оболочка из ПВХ с заполнением между жилами.'],
+    ['Жила','Медь, многопроволочная гибкая, класс гибкости 5.'],
+    ['Напряжение','380 В.'],
+    ['Температуры','По ГОСТ 7399-97: исполнение У от −40 до +40 °C, остальные от −25 до +40 °C.'],
+    ['Радиус изгиба','Около 4 диаметров (неподвижное применение).'],
+    ['Применение','Подключение бытовых приборов, удлинители, переносной электроинструмент.'],
+    ['Ограничения','Не для стационарной проводки и прокладки в земле.'],
+    ['Стандарт','ГОСТ 7399-97.']]},
+   {g:'f',n:'ШВВП',s:'Плоский шнур, медь, ПВХ, до 380 В',r:[
+    ['Что это','Гибкий плоский шнур с двумя параллельными медными жилами, изоляция и оболочка из ПВХ.'],
+    ['Жила','Медь, гибкая многопроволочная.'],
+    ['Напряжение','До 380 В.'],
+    ['Температуры','Исполнение У от −40 до +40 °C, остальные исполнения от −25 до +40 °C.'],
+    ['Применение','Подключение маломощных приборов: настольные лампы, радиоаппаратура, мелкая бытовая техника.'],
+    ['Ограничения','Не для мощных потребителей (чайник, обогреватель) и не для стационарной проводки.'],
+    ['Стандарт','ГОСТ 7399-97.']]},
+   {g:'f',n:'КГ, КГ-ХЛ',s:'Гибкий силовой кабель в резине',r:[
+    ['Что это','Гибкий кабель с медными жилами, изоляция и оболочка из резины. КГ-ХЛ: исполнение для холодного климата.'],
+    ['Жила','Медь, многопроволочная гибкая.'],
+    ['Напряжение','До 660 В переменного тока (до 400 Гц) или до 1000 В постоянного.'],
+    ['Радиус изгиба','Не менее 8 диаметров.'],
+    ['Применение','Подключение передвижных механизмов и переносных электроприёмников, сварочные работы, переносные удлинители на стройплощадках.'],
+    ['Особенности','Резиновая оболочка лучше ПВХ переносит механические нагрузки и частые перегибы.'],
+    ['Стандарт','ГОСТ 24334-2020 (ранее ГОСТ 24334-80).']]},
+   {g:'v',n:'СИП-4',s:'Самонесущий, алюминий, сшитый полиэтилен',r:[
+    ['Что это','Провод для воздушных линий и вводов в здания: от 2 до 4 скрученных изолированных жил, без несущей нулевой жилы.'],
+    ['Жила','Алюминий, многопроволочная уплотнённая.'],
+    ['Изоляция','Светостабилизированный сшитый полиэтилен.'],
+    ['Напряжение','0,6/1 кВ.'],
+    ['Температуры','Эксплуатация от −60 до +50 °C. Монтаж не ниже −20 °C. Жила длительно до +90 °C, при коротком замыкании до +250 °C.'],
+    ['Радиус изгиба','Не менее 10 диаметров.'],
+    ['Срок службы','40 лет.'],
+    ['Применение','Воздушные линии до 1 кВ и ответвления от них к вводам, прокладка по стенам и опорам.'],
+    ['Ограничения','Не для прокладки в земле и внутри помещений.'],
+    ['Стандарт','ГОСТ 31946-2012.']]}
+  ];
+  function renderK(){
+    var g=$('k-grp').value, q=$('k-q').value.trim().toLowerCase(), o='';
+    CAB.forEach(function(c){
+      if((g!=='all'&&c.g!==g)||(q&&(c.n+' '+c.s).toLowerCase().indexOf(q)<0)) return;
+      o+='<details class="k"><summary><b>'+esc(c.n)+'</b><span>'+esc(c.s)+'</span></summary><dl class="kv">'+c.r.map(function(x){ return '<dt>'+esc(x[0])+'</dt><dd>'+esc(x[1])+'</dd>'; }).join('')+'</dl></details>';
+    });
+    $('k-list').innerHTML=o||'<p class="hint">Ничего не найдено.</p>';
+  }
+  $('k-q').addEventListener('input',renderK); $('k-grp').addEventListener('input',renderK);
+
+  /* ---- вкладки ---- */
+  function setMode(m){
+    ['c','d','a','k'].forEach(function(k){ $('tab-'+k).setAttribute('aria-selected',m===k); });
+    $('panel-c').hidden=m!=='c'; $('panel-d').hidden=m!=='d'; $('out-d').hidden=m!=='d';
+    $('panel-a').hidden=m!=='a'; $('out').hidden=m!=='a'; $('awg-table').hidden=m!=='a'; $('panel-k').hidden=m!=='k';
+    if(m==='c') calcC(); else if(m==='d') calcD(); else if(m==='a') calcA(); else renderK();
+  }
+  ['c','d','a','k'].forEach(function(k){ $('tab-'+k).onclick=function(){ setMode(k); }; });
+  setMode('c');
+})();
+</script>
+</body>
+</html>
